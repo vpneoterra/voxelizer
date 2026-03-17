@@ -138,7 +138,14 @@ export class TripoClient {
 
       if (status === 'success') {
         onProgress?.('generate', 'done');
-        return data.data.output?.model;
+        // Tripo API v2 returns the GLB URL in multiple locations — try them all
+        const output = data.data.output || {};
+        const result = data.data.result || {};
+        return output.model
+            || output.pbr_model
+            || result.pbr_model?.url
+            || result.model?.url
+            || null;
       }
 
       if (status === 'failed' || status === 'cancelled') {
