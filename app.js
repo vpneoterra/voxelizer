@@ -8,6 +8,10 @@ import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { TripoClient } from './tripoClient.js';
 import { VoxelRenderer } from './voxelRenderer.js';
 
+// ═══════════ CONFIG ═══════════
+
+const DEFAULT_API_KEY = 'tsk_KZcdv4OqQOC0v-SKIVbpi87RfWwmGjfSOFYZonRnouo';
+
 // ═══════════ STATE ═══════════
 
 let currentState = 'IDLE';
@@ -204,7 +208,7 @@ async function handleGLBFile(file) {
 async function startGeneration() {
   if (!imageFile) return;
 
-  const apiKey = apiKeyInput.value.trim();
+  const apiKey = apiKeyInput.value.trim() || DEFAULT_API_KEY;
   if (!apiKey) { showError('Please enter your Tripo AI API key.'); return; }
 
   cancelCurrentOp();
