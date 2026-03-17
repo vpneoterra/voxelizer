@@ -1,9 +1,19 @@
 /**
  * tripoClient.js — Tripo AI API wrapper
  * Handles image upload, task creation, polling, and GLB download.
+ * All requests route through the Express CORS proxy at /api/tripo/.
  */
 
-const API_BASE = 'https://api.tripo3d.ai/v2/openapi';
+// Build the proxy base URL. During local dev it's http://localhost:8000.
+// After deploy_website, __PORT_8000__ is replaced with the real proxy path.
+const PROXY_PORT = '__PORT_8000__';
+const API_BASE = PROXY_PORT.startsWith('__')
+  ? 'http://localhost:8000/api/tripo/v2/openapi'
+  : `${PROXY_PORT}/api/tripo/v2/openapi`;
+
+const DOWNLOAD_PROXY = PROXY_PORT.startsWith('__')
+  ? 'http://localhost:8000/api/tripo/proxy-download'
+  : `${PROXY_PORT}/api/tripo/proxy-download`;
 
 export class TripoClient {
   constructor(apiKey) {
@@ -143,14 +153,23 @@ export class TripoClient {
   }
 
   /**
-   * Download the GLB file as ArrayBuffer
+   * Download the GLB file as ArrayBuffer.
+   * Try direct first (CDN URLs are usually CORS-friendly).
+   * Fall back to our proxy if direct fetch fails.
    */
   async downloadModel(modelUrl, onProgress) {
     onProgress?.('download', 'active');
 
-    const resp = await fetch(modelUrl, {
+    // Try direct download first
+    let resp = await fetch(modelUrl, {
       signal: this.abortController.signal
-    });
+    }).catch(() => null);
+
+    // If direct failed, route through our proxy
+    if (!resp || !resp.ok) {
+      const proxied = `${DOWNLOAD_PROXY}?url=${encodeURIComponent(modelUrl)}`;
+      resp = await fetch(proxied, { signal: this.abortController.signal });
+    }
 
     if (!resp.ok) {
       throw new Error(`Model download failed (HTTP ${resp.status})`);
