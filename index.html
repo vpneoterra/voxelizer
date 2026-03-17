@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<!--
+   ______                            __
+  / ____/___  ____ ___  ____  __  __/ /____  _____
+ / /   / __ \/ __ `__ \/ __ \/ / / / __/ _ \/ ___/
+/ /___/ /_/ / / / / / / /_/ / /_/ / /_/  __/ /
+\____/\____/_/ /_/ /_/ .___/\__,_/\__/\___/_/
+                    /_/
+        Created with Perplexity Computer
+        https://www.perplexity.ai/computer
+-->
+
+<!-- Perplexity Computer Attribution — SEO Meta Tags -->
+<meta name="generator" content="Perplexity Computer">
+<meta name="author" content="Perplexity Computer">
+<meta property="og:see_also" content="https://www.perplexity.ai/computer">
+<link rel="author" href="https://www.perplexity.ai/computer">
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image to Voxel — 3D Viewer</title>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+/* ═══════════ RESET & BASE ═══════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --text-xs:   clamp(0.75rem,  0.7rem  + 0.25vw, 0.875rem);
+  --text-sm:   clamp(0.875rem, 0.8rem  + 0.35vw, 1rem);
+  --text-base: clamp(1rem,     0.95rem + 0.25vw, 1.125rem);
+  --text-lg:   clamp(1.125rem, 1rem    + 0.75vw, 1.5rem);
+
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.25rem;
+  --space-6:  1.5rem;
+  --space-8:  2rem;
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ═══════════ DARK THEME (primary) ═══════════ */
+[data-theme="dark"] {
+  --bg:             #12121a;
+  --surface:        #1a1a2e;
+  --surface-2:      #20203a;
+  --surface-3:      #282848;
+  --border:         #2e2e52;
+  --text:           #e0e0ef;
+  --text-muted:     #8888aa;
+  --text-faint:     #5a5a7a;
+  --accent:         #6c63ff;
+  --accent-hover:   #8078ff;
+  --accent-active:  #5548e0;
+  --accent-glow:    rgba(108, 99, 255, 0.25);
+  --error:          #ff6b6b;
+  --success:        #51cf66;
+  --warning:        #ffd43b;
+}
+
+[data-theme="light"] {
+  --bg:             #f0f0f5;
+  --surface:        #ffffff;
+  --surface-2:      #f5f5fa;
+  --surface-3:      #eeeef4;
+  --border:         #d0d0e0;
+  --text:           #1a1a2e;
+  --text-muted:     #6a6a88;
+  --text-faint:     #9999b0;
+  --accent:         #5548e0;
+  --accent-hover:   #6c63ff;
+  --accent-active:  #4438c4;
+  --accent-glow:    rgba(85, 72, 224, 0.15);
+  --error:          #e03131;
+  --success:        #2f9e44;
+  --warning:        #f08c00;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: var(--text-base);
+  color: var(--text);
+  background-color: var(--bg);
+  min-height: 100dvh;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+/* ═══════════ LAYOUT ═══════════ */
+.app {
+  display: flex;
+  height: 100dvh;
+  width: 100%;
+}
+
+.sidebar {
+  width: 320px;
+  min-width: 320px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.sidebar-header {
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sidebar-header h1 {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sidebar-header h1 svg {
+  width: 22px;
+  height: 22px;
+  color: var(--accent);
+}
+
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  transition: color var(--transition), background var(--transition);
+}
+.theme-toggle:hover { color: var(--text); background: var(--surface-2); }
+
+.sidebar-body {
+  flex: 1;
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.viewport {
+  flex: 1;
+  position: relative;
+  background: var(--bg);
+  overflow: hidden;
+}
+
+.viewport canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ═══════════ DROP ZONE ═══════════ */
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8) var(--space-4);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--transition), background var(--transition);
+  position: relative;
+}
+.drop-zone:hover,
+.drop-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+.drop-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.drop-zone-icon {
+  width: 40px;
+  height: 40px;
+  margin: 0 auto var(--space-3);
+  color: var(--text-muted);
+}
+.drop-zone-text {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.drop-zone-text strong {
+  color: var(--accent);
+}
+
+/* ═══════════ IMAGE PREVIEW ═══════════ */
+.preview-container {
+  display: none;
+  position: relative;
+}
+.preview-container.visible { display: block; }
+.preview-img {
+  width: 100%;
+  max-height: 180px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+.preview-remove {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  font-size: 14px;
+  transition: background var(--transition);
+}
+.preview-remove:hover { background: var(--error); }
+
+/* ═══════════ API KEY ═══════════ */
+.api-key-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.api-key-section label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.api-key-input-wrap {
+  display: flex;
+  gap: var(--space-2);
+}
+.api-key-input-wrap input {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-family: monospace;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.api-key-input-wrap input:focus {
+  border-color: var(--accent);
+}
+
+/* ═══════════ BUTTONS ═══════════ */
+.btn {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.btn-primary:active:not(:disabled) { background: var(--accent-active); }
+
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--surface-3); }
+
+.btn-sm {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+/* ═══════════ PROGRESS ═══════════ */
+.progress-section {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.progress-section.visible { display: flex; }
+
+.progress-bar-track {
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  width: 0%;
+  transition: width 300ms ease;
+}
+.progress-bar-fill.indeterminate {
+  width: 30%;
+  animation: indeterminate 1.4s ease infinite;
+}
+@keyframes indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(430%); }
+}
+
+.progress-stages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.progress-stage {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  transition: color var(--transition);
+}
+.progress-stage.active  { color: var(--accent); font-weight: 600; }
+.progress-stage.done    { color: var(--success); }
+.progress-stage.error   { color: var(--error); }
+
+.progress-stage .stage-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.progress-stage .stage-icon .spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.elapsed-time {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  text-align: right;
+}
+
+/* ═══════════ CONTROLS (post-render) ═══════════ */
+.controls-section {
+  display: none;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.controls-section.visible { display: flex; }
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.control-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  justify-content: space-between;
+}
+
+.resolution-btns {
+  display: flex;
+  gap: var(--space-1);
+}
+.resolution-btns button {
+  flex: 1;
+  padding: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.resolution-btns button.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.resolution-btns button:hover:not(.active) {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+}
+.toggle-row span {
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  cursor: pointer;
+}
+.toggle-switch input { display: none; }
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--surface-3);
+  border-radius: 12px;
+  transition: background var(--transition);
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform var(--transition);
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--accent);
+}
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(18px);
+}
+
+.action-btns {
+  display: flex;
+  gap: var(--space-2);
+}
+.action-btns .btn { flex: 1; }
+
+/* ═══════════ ERROR STATE ═══════════ */
+.error-section {
+  display: none;
+  padding: var(--space-4);
+  background: rgba(255, 107, 107, 0.08);
+  border: 1px solid rgba(255, 107, 107, 0.2);
+  border-radius: var(--radius-md);
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.error-section.visible { display: flex; }
+.error-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--error);
+}
+.error-message {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+/* ═══════════ EMPTY VIEWPORT ═══════════ */
+.viewport-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.viewport-empty svg {
+  width: 64px;
+  height: 64px;
+  opacity: 0.3;
+}
+.viewport-empty p {
+  font-size: var(--text-sm);
+  text-align: center;
+  max-width: 260px;
+}
+
+/* ═══════════ GLB UPLOAD ═══════════ */
+.or-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+.or-divider::before,
+.or-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.glb-upload-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+}
+.glb-upload-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-glow);
+}
+.glb-upload-btn input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ═══════════ FOOTER ═══════════ */
+.sidebar-footer {
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.sidebar-footer a {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+.sidebar-footer a:hover { color: var(--text-muted); }
+
+/* ═══════════ VOXEL STATS ═══════════ */
+.stats-bar {
+  display: none;
+  position: absolute;
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-5);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  gap: var(--space-5);
+  white-space: nowrap;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+.stats-bar.visible { display: flex; }
+.stats-bar .stat {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.stats-bar .stat-value { color: var(--text); font-weight: 600; }
+
+/* ═══════════ RESPONSIVE ═══════════ */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    min-width: unset;
+    max-height: 45vh;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .viewport {
+    min-height: 55vh;
+  }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+          <line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+        Voxelizer
+      </h1>
+      <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="sidebar-body">
+      <!-- API KEY -->
+      <div class="api-key-section">
+        <label for="apiKeyInput">Tripo AI API Key</label>
+        <div class="api-key-input-wrap">
+          <input type="password" id="apiKeyInput" placeholder="tsk_..." autocomplete="off">
+        </div>
+      </div>
+
+      <!-- DROP ZONE -->
+      <div class="drop-zone" id="dropZone">
+        <input type="file" accept="image/png,image/jpeg,image/webp" id="imageInput">
+        <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <p class="drop-zone-text">Drag & drop an image or <strong>browse</strong><br><span style="font-size: var(--text-xs); opacity: 0.7;">PNG, JPG, or WebP &middot; max 20 MB</span></p>
+      </div>
+
+      <!-- IMAGE PREVIEW -->
+      <div class="preview-container" id="previewContainer">
+        <img class="preview-img" id="previewImg" alt="Uploaded image preview">
+        <button class="preview-remove" id="previewRemove" title="Remove image">&times;</button>
+      </div>
+
+      <!-- GENERATE BUTTON -->
+      <button class="btn btn-primary" id="generateBtn" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Generate Voxel Model
+      </button>
+
+      <!-- OR: LOCAL GLB -->
+      <div class="or-divider">or</div>
+      <div class="glb-upload-btn" id="glbUploadBtn">
+        <input type="file" accept=".glb,.gltf,.obj" id="glbInput">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+        Load GLB/OBJ file directly
+      </div>
+
+      <!-- PROGRESS -->
+      <div class="progress-section" id="progressSection">
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-stages" id="progressStages">
+          <div class="progress-stage" data-stage="upload">
+            <span class="stage-icon"></span>
+            <span>Uploading image</span>
+          </div>
+          <div class="progress-stage" data-stage="generate">
+            <span class="stage-icon"></span>
+            <span>Generating 3D model</span>
+          </div>
+          <div class="progress-stage" data-stage="download">
+            <span class="stage-icon"></span>
+            <span>Downloading mesh</span>
+          </div>
+          <div class="progress-stage" data-stage="voxelize">
+            <span class="stage-icon"></span>
+            <span>Voxelizing</span>
+          </div>
+          <div class="progress-stage" data-stage="render">
+            <span class="stage-icon"></span>
+            <span>Rendering</span>
+          </div>
+        </div>
+        <div class="elapsed-time" id="elapsedTime"></div>
+      </div>
+
+      <!-- ERROR -->
+      <div class="error-section" id="errorSection">
+        <div class="error-title">Generation Failed</div>
+        <div class="error-message" id="errorMessage"></div>
+        <button class="btn btn-secondary btn-sm" id="retryBtn">Retry</button>
+      </div>
+
+      <!-- CONTROLS -->
+      <div class="controls-section" id="controlsSection">
+        <div class="control-group">
+          <div class="control-label">
+            <span>Resolution</span>
+            <span id="resolutionValue">32</span>
+          </div>
+          <div class="resolution-btns" id="resolutionBtns">
+            <button data-res="16">16</button>
+            <button data-res="32" class="active">32</button>
+            <button data-res="64">64</button>
+            <button data-res="128">128</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="toggle-row">
+            <span>Surface only</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="surfaceToggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <span>Wireframe edges</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="wireframeToggle">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="toggle-row">
+            <span>Auto-rotate</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="autoRotateToggle" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="action-btns">
+          <button class="btn btn-secondary btn-sm" id="screenshotBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Screenshot
+          </button>
+          <button class="btn btn-secondary btn-sm" id="exportBtn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export OBJ
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <a href="https://www.perplexity.ai/computer" target="_blank" rel="noopener noreferrer">
+        Created with Perplexity Computer
+      </a>
+    </div>
+  </aside>
+
+  <!-- 3D VIEWPORT -->
+  <main class="viewport" id="viewport">
+    <div class="viewport-empty" id="viewportEmpty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+        <line x1="12" y1="22.08" x2="12" y2="12"/>
+      </svg>
+      <p>Upload an image to generate a voxelized 3D model, or load a GLB file directly</p>
+    </div>
+    <div class="stats-bar" id="statsBar">
+      <div class="stat">Voxels: <span class="stat-value" id="statVoxels">—</span></div>
+      <div class="stat">Resolution: <span class="stat-value" id="statRes">—</span></div>
+      <div class="stat">FPS: <span class="stat-value" id="statFPS">—</span></div>
+    </div>
+  </main>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
