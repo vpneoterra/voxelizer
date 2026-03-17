@@ -22,6 +22,7 @@ let geometryBackup = null; // always-valid deep copy for re-voxelization
 let currentVoxelPositions = null;
 let currentVoxelCount = 0;
 let worker = null;
+let workerBlobUrl = null;  // cached Blob URL for the voxelizer worker
 let tripoClient = null;
 let renderer = null;
 let elapsedInterval = null;
@@ -276,9 +277,22 @@ function voxelize() {
 
   updateStage('voxelize', 'active');
 
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     if (worker) worker.terminate();
-    worker = new Worker('./voxelizer.js');
+
+    // Create worker from Blob URL to avoid cross-origin issues in sandboxed iframes
+    if (!workerBlobUrl) {
+      try {
+        const resp = await fetch('./voxelizer.js');
+        const code = await resp.text();
+        const blob = new Blob([code], { type: 'application/javascript' });
+        workerBlobUrl = URL.createObjectURL(blob);
+      } catch (err) {
+        reject(new Error('Failed to load voxelizer worker: ' + err.message));
+        return;
+      }
+    }
+    worker = new Worker(workerBlobUrl);
 
     worker.onmessage = (e) => {
       const msg = e.data;
